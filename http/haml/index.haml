@@ -1,0 +1,55 @@
+!!!
+%head
+  %title myGit
+  %meta{:charset => "utf-8"}/
+  %link{:href => "/css/reset.css", :rel => "stylesheet", :type => "text/css"}
+  %link{:href => "/css/ui.fancytree.css ", :rel => "stylesheet", :type => "text/css"}
+  %link{:href => "/css/642.css", :rel => "stylesheet", :type => "text/css"}
+  %link{:href => "/css/style.css", :rel => "stylesheet", :type => "text/css"}
+  %link{:href => "http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.min.css", :rel => "stylesheet", :type => "text/css"}
+
+  %script{:src => "https://code.jquery.com/jquery-2.1.1.min.js"}
+  %script{:src => "https://code.jquery.com/ui/1.11.2/jquery-ui.min.js"}
+  %script{:src => "http://static.lnx.fi/mygit/jquery.fancytree-all.js"}
+  //%script{:src => "https://rawgit.com/mar10/fancytree/master/src/jquery.fancytree.js"}
+  //%script{:src => "https://rawgit.com/mar10/fancytree/master/src/jquery.fancytree.edit.js"}
+  //%script{:src => "https://rawgit.com/mar10/fancytree/master/src/jquery.fancytree.dnd.js"}
+  %script{:src => "//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js"}
+  %script{:src => "//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-haml.js"}
+  %script{:src => "/script.js"}
+
+%body
+  #wrapper
+    #navigation
+      myGit
+      %span#status
+    #leftmenu
+      %a.pro{onClick: "init_editor(null); return(false);"} <<
+      %a.pro{onClick: "git('status'); return(false);"} STA
+      %a.pro{onClick: "git('clone'); return(false);"} CLO
+      %a.pro{onClick: "git('pull'); return(false);"} PUL
+      %a.pro{onClick: "git('commit_all'); return(false);"} COM
+    #leftcolumn
+    #content
+      #cmenu
+        %a.current{onClick: "git('checkout'); return(false);"} REV
+        %a.current{onClick: "git('commit'); return(false);"} COM
+        %a.current{onClick: "git('delete'); return(false);"} DEL
+        %a.current{onClick: "git('beautify'); return(false);"} BEA
+      #tabs
+      #editor
+    #rightcolumn
+      Terminal:
+      %br
+    #cbot
+      %input{onkeydown: "if (event.keyCode == 13) {stm_port('puts',$(this).val());$(this).val('');}; return(true);"}
+      %a{onClick: "stm_port('puts','tasks stat'); return(false);"} TAS
+      %a{onClick: "stm_port('puts','cfg dump'); return(false);"} CFG
+      %a{onClick: "stm_port('puts','auth 1682'); return(false);"} AUT
+      %a{onClick: "stm_port('puts','ident'); return(false);"} IDE
+      %a{onClick: "stm_port('boot',0); return(false);"} B
+      %a{onClick: "stm_port('flash',0); return(false);"} F
+      %a{onClick: "stm_port('go',0); return(false);"} GO
+
+
+
