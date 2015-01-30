@@ -25,6 +25,9 @@ sse_data = (src,data) ->
   #console.log "sse:",data
   obj=$("#rightcolumn")
   if data.logs
+    arr=obj.html().split("\n")
+    if arr.length>100
+      obj.html("")
     for l in data.logs
       if src=="$"
         obj.append("<font color='#80ff80'>#{l}</font>")
@@ -637,7 +640,7 @@ show_diffs = ->
   editor.clearSelection()
   editor.gotoLine(0)
   editor.focus(0)
-  editor.setOptions({fontSize: "12pt"})
+  editor.setOptions({fontSize: "9pt"})
   editor.setTheme("ace/theme/vibrant_ink");
   editor.commands.addCommand
     name: "mySave"

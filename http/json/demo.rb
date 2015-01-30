@@ -77,7 +77,32 @@ def json_demo request,args,session,event
       fn=args['fn']
       $sessions[session][:queue] << "GIT: #{subact} #{path}:" if  $sessions[session]
       url="git@github.com:#{path}"
-      if subact=='clone'
+      if subact=='make_build' #increment build number
+        cnt=1
+        begin
+          s = IO.read("#{path}/build.cnt")
+          puts "read #{s}"
+          cnt=s.to_i
+        rescue
+          cnt=1
+        end
+        puts "-> #{cnt}"
+        cnt+=1
+        f=File.open("#{path}/build.cnt","w")
+        f.write("#{cnt}\n")
+        f.close()
+        f=File.open("#{path}/build.def","w")
+        f.write("#{cnt}")
+        f.close()
+        puts "BUILDER!!!!!!!!! #{path} => #{cnt}"
+        return ["text/json",{alert: "BUILDING : #{cnt}"}]
+      elsif subact=='indev' #dev builds now
+        puts "INDEV!!!!!!!!! #{path}"
+        f=File.open("#{path}/build.def","w")
+        f.write("0")
+        f.close()
+        return ["text/json",{alert: "INDEV"}]
+      elsif subact=='clone'
         cmd="git #{subact} #{url} #{path}"
       elsif subact=='delete' #not acatually git stuf...
         if File.file? fn
@@ -327,9 +352,19 @@ def json_demo request,args,session,event
               file="#{path}/#{$1}"
               errs[file]=[] if not errs[file]
               errs[file]<< {fn: file, row: $2, type: $4, txt: $5}
+            elsif r[/(.+):(\d+): undefined reference to (.+)$/]
+              pwd=Dir.pwd
+              #/home/arisi/projects/mygit/arisi/ctex_apps/src/appi.c:35: undefined reference to `xxx'
+              row=$2
+              sym=$3
+              puts "********************* LINKER ERROR at #{row}"
+              file=$1.sub("#{pwd}/","")
+              errs[file]=[] if not errs[file]
+              errs[file]<< {fn: file, row: row, type: :error, txt: "LINKER: undefined reference to `#{sym}'"}
             end
           end
           ok=false if errs!={}
+          pp errs
         rescue => e
           puts e
           pp e.backtrace
