@@ -33,6 +33,32 @@ def directory_flat(path)
   return data
 end
 
+def flash_cortex path, session
+  puts "flash_cortex starts: #{path}"
+  errs={}
+  begin
+    $sessions[session][:queue] << "CORTEX "
+    http = Curl.get("http://192.168.33.10:3000/kernel/make/swd/STM32L/mg11")
+    puts "COMPILED:::::::::::::::::::::::.."
+    json=JSON.parse http.body_str
+    pp json
+    json['errs'].each do |fn,err|
+      puts ">>#{fn}"
+      ffn="#{path}/#{fn}"
+      errs[ffn]=[]
+      err.each do |e|
+        e['fn']=ffn
+        errs[ffn]<<e
+      end
+      #errs[ffn]['fn']=ffn
+    end
+    json['errs']=errs #silly fiddle for old ruby crap
+  end
+  puts "flash_cortex errs:"
+  pp json
+  json
+end
+
 def json_demo request,args,session,event
   begin
     session=args['session'].to_i
@@ -213,10 +239,10 @@ def json_demo request,args,session,event
         pp diffs
         f={diffs: diffs,alert: alert}
       end
-      lines.each do |line|
-        $sessions[session][:queue] << "#{line}"
-        puts line
-      end
+      #lines.each do |line|
+      #  $sessions[session][:queue] << "#{line}"
+      #  puts line
+      #end
     elsif args['act']=='stop'
       if $sessions[session][:thread] and $sessions[session][:thread].status
         $sessions[session][:queue] << "Stopping old thread!"
@@ -225,7 +251,7 @@ def json_demo request,args,session,event
         $sessions[session][:queue] << "Nothing running!"
         f={alert: "We already have runnin thread!"}
       end
-    elsif args['act']=='go'
+    elsif args['act']=='gox'
       fn=args['fn']
       path=args['path']
       if File.file? "#{path}/compile.sh"
@@ -307,70 +333,38 @@ def json_demo request,args,session,event
           f={err: "#{e}"}
         end
       end
-    elsif args['act']=='save'
+    elsif args['act']=='save' or args['act']=='go'
       fn=args['fn']
       data=args['data']
       type=args['type']
       path=args['path']
-      pn = Pathname.new(fn)
-      if not File.directory? pn.dirname
-        puts "creating dir #{pn.dirname}"
-        FileUtils.mkdir_p pn.dirname
-      end
-      puts "SAVE #{fn} : '#{data}'"
-      File.open(fn, "w:UTF-8") do |file|
-        file.write(data)
-      end
+      #if args['act']=='save'
+        pn = Pathname.new(fn)
+        if not File.directory? pn.dirname
+          puts "creating dir #{pn.dirname}"
+          FileUtils.mkdir_p pn.dirname
+        end
+        puts "SAVE #{fn} : '#{data}'"
+        File.open(fn, "w:UTF-8") do |file|
+          file.write(data)
+        end
+      #end
       check=""
       ok=true
       errs={}
       newdata=nil
-      if File.file? "#{path}/compile.sh"
-        begin
-          $sessions[session][:queue] << "WE HAVE COMPILE SCRIPT #{fn} "
-          check=`cd #{path};./compile.sh x sol `.force_encoding("UTF-8")
-          puts "check: '#{check}'"
-          begin
-            l=check.split("\n")
-          rescue => e
-            puts e
-            pp e.backtrace
-            return ["text/json",{alert: "error #{e}"}]
-          end
-
-          l.each do |r|
-            puts "line: '#{r}'"
-            if r[/In file included from (.+):(\d+):(\d+):/]
-              file="#{path}/#{$1}"
-              errs[file]=[] if not errs[file]
-              errs[file]<< {row: $2, type: :error, txt: "Included file Has Errors!"}
-            elsif r[/(.+):(\d+):(\d+): fatal error: (.+)$/]
-              file="#{path}/#{$1}"
-              errs[file]=[] if not errs[file]
-              errs[file]<< {fn: file, row: $2, type: :error, txt: $4}
-            elsif r[/(.+):(\d+):(\d+): (.+): (.+)$/]
-              file="#{path}/#{$1}"
-              errs[file]=[] if not errs[file]
-              errs[file]<< {fn: file, row: $2, type: $4, txt: $5}
-            elsif r[/(.+):(\d+): undefined reference to (.+)$/]
-              pwd=Dir.pwd
-              #/home/arisi/projects/mygit/arisi/ctex_apps/src/appi.c:35: undefined reference to `xxx'
-              row=$2
-              sym=$3
-              puts "********************* LINKER ERROR at #{row}"
-              file=$1.sub("#{pwd}/","")
-              errs[file]=[] if not errs[file]
-              errs[file]<< {fn: file, row: row, type: :error, txt: "LINKER: undefined reference to `#{sym}'"}
-            end
-          end
-          ok=false if errs!={}
-          pp errs
-        rescue => e
-          puts e
-          pp e.backtrace
-          return ["text/json",{alert: "error #{e}"}]
+      if path[/ctex/] #cortex project ;)
+        cret=flash_cortex path,session
+        errs=cret["errs"]
+        if cret['result']=="ok" and args['act']=='go'
+          url=cret['target_srec']
+          puts "compile ok -- flashing #{url}"
+          http = Curl.get("http://20.20.20.21:3000/rest/7375403532333702473232/swd/flash?srec_url=#{url}")
+          puts "FLASHED:::::::::::::::::::::::.."
+          json=JSON.parse http.body_str
+          pp json
+          cret['flash']=json
         end
-
       elsif type=="c_cpp"
         cmd="uncrustify -f #{fn} -o #{fn} -c uncrustify.conf"
         system cmd
@@ -398,7 +392,7 @@ def json_demo request,args,session,event
             errs[file]<< {fn: file, row: $2, type: $4, txt: $5}
           end
         end
-        ok=false if errs!={}
+        ok=false #if errs!={}
       elsif type=="ruby"
         puts "exec 'ruby -c #{fn}'"
         check=`ruby -c #{fn} 2>&1`
@@ -414,9 +408,9 @@ def json_demo request,args,session,event
           end
         end
       end
-      puts "saved #{fn}: #{fn} -> #{check}\n"
+      puts "saved #{fn}: #{fn} , errs:\n"
       pp errs
-      f={save:ok, syntax: ok, errs: errs,data: newdata}
+      f={save:ok, syntax: ok, errs: errs,data: newdata,cret:cret}
       $sessions[session][:queue] << "Saved #{fn} "
     else
       f=[]

@@ -213,13 +213,13 @@ ensure_file = (fn) ->
   if not files[fn]
     files[fn]={data:null,valid:false,odata:null, open: false, type: "asciidoc", scroll_row:0, pos: {row:0, column:0},diffs:[], errs:[]}
 
-@saver = (fn,data) ->
-  console.log "SAVER: #{fn}, #{data.length}"
+@saver = (mode,fn,data) ->
+  console.log "SAVER: #{fn}, #{data.length} mode=#{mode}"
   $.ajax
     url: "/demo.json"
     type: "POST"
     data:
-      act: "save"
+      act: mode
       data: data
       fn: fn
       type: files[fn].type
@@ -243,8 +243,12 @@ ensure_file = (fn) ->
         else
           editor.gotoLine(0);
         changes=0
-
-      if not data.syntax
+      if true
+        console.log data.cret
+        if data.cret.result =="ok"
+          $("#rightcolumn").append "<font color='green'>compiled ok: #{data.cret.target_srec}</font><br>"
+        if data.cret.flash and data.cret.flash.result
+          $("#rightcolumn").append "<font color='green'><b>flashed: #{data.cret.flash.result}</b></font><br>"
         if data.errs
           for fn,data of data.errs
             a=[]
@@ -323,7 +327,7 @@ undo_clear = ->
 
 open_file = (fn) ->
   console.log "OPEN FILE",fn
-  save_current()
+  save_current("save")
   if fn and files[fn]
     #console.log "open #{fn}, ",files
     #console.log editor
@@ -462,23 +466,23 @@ update_tabs = ->
       return
   return
 
-save_current = ->
+save_current = (mode)->
   if current
     pos=editor.getCursorPosition()
     if changes>0 or pos.row>0 or pos.column>0
       files[current].pos=pos
       console.log "got pos:",files[current].pos,current
       files[current].scroll_row=editor.getFirstVisibleRow()
-    if changes>0 and files[current].valid
+    if (changes>0 and files[current].valid) or mode=="go"
       console.log "save_current,",current,changes
       files[current].data=editor.getValue()
-      saver current,files[current].data
+      saver mode,current,files[current].data
       changes=0
     ##matter of taste...undo_clear()
 
 myTimer = ->
-  if current and changes>0 and last_change>0 and last_change<(new Date).getTime()-2000
-    save_current()
+  #if current and changes>0 and last_change>0 and last_change<(new Date).getTime()-2000
+  #  save_current()
   if current
     $(".current").show()
     $(".nocurrent").hide()
@@ -648,7 +652,7 @@ show_diffs = ->
       win: "Ctrl-S"
       mac: "Command-S"
     exec: (editor) ->
-      save_current()
+      save_current("save")
 
     readOnly: true
 
@@ -684,7 +688,8 @@ show_diffs = ->
       win: "Ctrl-G"
       mac: "Command-G"
     exec: (editor) ->
-      if current
+      save_current("go")
+      if current and false
         console.log "GO!"
         $.ajax(
           url: "/demo.json"
@@ -694,6 +699,12 @@ show_diffs = ->
             path: pro
             fn: current
         ).done((result) ->
+          console.log "go returns"
+          console.log result
+          if result.cret.result =="ok"
+            $("#rightcolumn").append "<font color='green'>compiled ok: #{result.cret.target_srec}</font><br>"
+          if result.cret.flash and result.cret.flash.result
+            $("#rightcolumn").append "<font color='green'><b>flashed: #{result.cret.flash.result}</b></font><br>"
           return
         ).fail((result) ->
           return
@@ -776,11 +787,12 @@ $ ->
   stream.addEventListener "message", (event) ->
     sse_data('',$.parseJSON(event.data))
     return
-  streamc = new EventSource("http://20.20.20.21:8087/sse_demo.json")
-  streamc.addEventListener "message", (event) ->
-    console.log "korteksi:",$.parseJSON(event.data)
-    sse_data('$',$.parseJSON(event.data))
-    return
+  if false
+    streamc = new EventSource("http://20.20.20.21:8087/sse_demo.json")
+    streamc.addEventListener "message", (event) ->
+      console.log "korteksi:",$.parseJSON(event.data)
+      sse_data('$',$.parseJSON(event.data))
+      return
 
   editor = ace.edit("editor");
   editor.setTheme("ace/theme/textmate")
